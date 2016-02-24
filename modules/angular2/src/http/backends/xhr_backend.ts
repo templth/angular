@@ -31,6 +31,9 @@ export class XHRConnection implements Connection {
     this.request = req;
     this.response = new Observable((responseObserver: Observer<Response>) => {
       let _xhr: XMLHttpRequest = browserXHR.build();
+      if (isPresent(req.withCredentials)) {
+      _xhr.withCredentials = req.withCredentials;
+      }
       _xhr.open(RequestMethod[req.method].toUpperCase(), req.url);
       // load event handler
       let onLoad = () => {
