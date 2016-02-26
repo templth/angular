@@ -32,8 +32,7 @@ export interface RequestOptionsArgs {
   search?: string | URLSearchParams;
   headers?: Headers;
   // TODO: Support Blob, ArrayBuffer, JSON, URLSearchParams, FormData
-  body?: string;
-  withCredentials?: boolean;
+  body?: string | Blob | ArrayBuffer | URLSearchParams | FormData | any;
 }
 
 /**

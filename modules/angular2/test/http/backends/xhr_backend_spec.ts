@@ -22,6 +22,7 @@ import {Map} from 'angular2/src/facade/collection';
 import {RequestOptions, BaseRequestOptions} from 'angular2/src/http/base_request_options';
 import {BaseResponseOptions, ResponseOptions} from 'angular2/src/http/base_response_options';
 import {ResponseType} from 'angular2/src/http/enums';
+import {URLSearchParams} from 'angular2/src/http/url_search_params';
 
 var abortSpy: any;
 var sendSpy: any;
@@ -106,7 +107,6 @@ export function main() {
     describe('XHRConnection', () => {
       it('should use the injected BaseResponseOptions to create the response',
          inject([AsyncTestCompleter], (async: AsyncTestCompleter) => {
-       console.log('test1');
            var connection = new XHRConnection(sampleRequest, new MockBrowserXHR(),
                                               new ResponseOptions({type: ResponseType.Error}));
            connection.response.subscribe((res: Response) => {
@@ -175,6 +175,107 @@ export function main() {
         expect(setRequestHeaderSpy).toHaveBeenCalledWith('Breaking-Bad', '<3');
         expect(setRequestHeaderSpy).toHaveBeenCalledWith('X-Multi', 'a,b');
       });
+
+      it('should use object body and detect content type header to the request', () => {
+        var body = {test: 'val'};
+        var base = new BaseRequestOptions();
+        var connection = new XHRConnection(
+            new Request(base.merge(new RequestOptions({body: body}))), new MockBrowserXHR());
+        connection.response.subscribe();
+        expect(sendSpy).toHaveBeenCalledWith(JSON.stringify(body));
+        expect(setRequestHeaderSpy).toHaveBeenCalledWith('Content-Type', 'application/json');
+      });
+
+      it('should use URLSearchParams body and detect content type header to the request', () => {
+        var body = new URLSearchParams();
+        body.set('test1', 'val1');
+        body.set('test2', 'val2');
+        var base = new BaseRequestOptions();
+        var connection = new XHRConnection(
+            new Request(base.merge(new RequestOptions({body: body}))), new MockBrowserXHR());
+        connection.response.subscribe();
+        expect(sendSpy).toHaveBeenCalledWith('test1=val1&test2=val2');
+        expect(setRequestHeaderSpy)
+            .toHaveBeenCalledWith('Content-Type',
+                                  'application/x-www-form-urlencoded;charset=UTF-8');
+      });
+
+      it('should use FormData body and detect content type header to the request', () => {
+        var body = new FormData();
+        body.append('test1', 'val1');
+        body.append('test2', 123456);
+        var blob = new Blob(['body { color: red; }'], {type: 'text/css'});
+        body.append("userfile", blob);
+        var base = new BaseRequestOptions();
+        var connection = new XHRConnection(
+            new Request(base.merge(new RequestOptions({body: body}))), new MockBrowserXHR());
+        connection.response.subscribe();
+        expect(sendSpy).toHaveBeenCalledWith(body);
+        expect(setRequestHeaderSpy).not.toHaveBeenCalledWith();
+      });
+
+      it('should use blob body and detect content type header to the request', () => {
+        var body = new Blob(['body { color: red; }'], {type: 'text/css'});
+        var base = new BaseRequestOptions();
+        var connection = new XHRConnection(
+            new Request(base.merge(new RequestOptions({body: body}))), new MockBrowserXHR());
+        connection.response.subscribe();
+        expect(sendSpy).toHaveBeenCalledWith(body);
+        expect(setRequestHeaderSpy).toHaveBeenCalledWith('Content-Type', 'text/css');
+      });
+
+      it('should use blob body without type to the request', () => {
+        var body = new Blob(['body { color: red; }']);
+        var base = new BaseRequestOptions();
+        var connection = new XHRConnection(
+            new Request(base.merge(new RequestOptions({body: body}))), new MockBrowserXHR());
+        connection.response.subscribe();
+        expect(sendSpy).toHaveBeenCalledWith(body);
+        expect(setRequestHeaderSpy).not.toHaveBeenCalledWith();
+      });
+
+      it('should use blob body without type with custom content type header to the request', () => {
+        var headers = new Headers({'Content-Type': 'text/css'});
+        var body = new Blob(['body { color: red; }']);
+        var base = new BaseRequestOptions();
+        var connection = new XHRConnection(
+            new Request(base.merge(new RequestOptions({body: body, headers: headers}))),
+            new MockBrowserXHR());
+        connection.response.subscribe();
+        expect(sendSpy).toHaveBeenCalledWith(body);
+        expect(setRequestHeaderSpy).toHaveBeenCalledWith('Content-Type', 'text/css');
+      });
+
+      it('should use array buffer body to the request', () => {
+        var body = new ArrayBuffer(512);
+        var longInt8View = new Uint8Array(body);
+        for (var i = 0; i < longInt8View.length; i++) {
+          longInt8View[i] = i % 255;
+        }
+        var base = new BaseRequestOptions();
+        var connection = new XHRConnection(
+            new Request(base.merge(new RequestOptions({body: body}))), new MockBrowserXHR());
+        connection.response.subscribe();
+        expect(sendSpy).toHaveBeenCalledWith(body);
+        expect(setRequestHeaderSpy).not.toHaveBeenCalledWith();
+      });
+
+      it('should use array buffer body without type with custom content type header to the request',
+         () => {
+           var headers = new Headers({'Content-Type': 'text/css'});
+           var body = new ArrayBuffer(512);
+           var longInt8View = new Uint8Array(body);
+           for (var i = 0; i < longInt8View.length; i++) {
+             longInt8View[i] = i % 255;
+           }
+           var base = new BaseRequestOptions();
+           var connection = new XHRConnection(
+               new Request(base.merge(new RequestOptions({body: body, headers: headers}))),
+               new MockBrowserXHR());
+           connection.response.subscribe();
+           expect(sendSpy).toHaveBeenCalledWith(body);
+           expect(setRequestHeaderSpy).toHaveBeenCalledWith('Content-Type', 'text/css');
+         });
 
       it('should return the correct status code',
          inject([AsyncTestCompleter], (async: AsyncTestCompleter) => {
@@ -335,27 +436,6 @@ export function main() {
            existingXHRs[0].setStatusCode(statusCode);
            existingXHRs[0].dispatchEvent('load');
          }));
-
-      it('should set withCredentials to true when defined in request options for CORS situations',
-        inject([AsyncTestCompleter], (async: AsyncTestCompleter) => {
-          var statusCode = 200;
-          sampleRequest.withCredentials = true;
-          var mockXhr = new MockBrowserXHR();
-          var connection = new XHRConnection(sampleRequest, mockXhr,
-                                              new ResponseOptions({ status: statusCode }));
-          var responseHeaders = `X-Request-URL: http://somedomain.com
-           Foo: Bar`
-
-          connection.response.subscribe((res: Response) => {
-            expect(res.url).toEqual('http://somedomain.com');
-            expect(existingXHRs[0].withCredentials).toBeTruthy();
-            async.done();
-          });
-
-          existingXHRs[0].setResponseHeaders(responseHeaders);
-          existingXHRs[0].setStatusCode(statusCode);
-          existingXHRs[0].dispatchEvent('load');
-      }));
     });
   });
 }

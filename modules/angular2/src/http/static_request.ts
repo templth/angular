@@ -1,6 +1,8 @@
 import {RequestMethod} from './enums';
 import {RequestArgs} from './interfaces';
 import {Headers} from './headers';
+import {ContentType} from './enums';
+import {URLSearchParams} from './url_search_params';
 import {normalizeMethodName} from './http_utils';
 import {
   RegExpWrapper,
@@ -59,10 +61,10 @@ export class Request {
   headers: Headers;
   /** Url of the remote resource */
   url: string;
-  // TODO: support URLSearchParams | FormData | Blob | ArrayBuffer
-  private _body: string;
-  /** Enable use credentials */
-  withCredentials: boolean;
+  /** Body of the request **/
+  private _body: string | Blob | ArrayBuffer | URLSearchParams | FormData | any;
+  /** Type of the request body **/
+  private contentType: ContentType;
   constructor(requestOptions: RequestArgs) {
     // TODO: assert that url is present
     let url = requestOptions.url;
@@ -79,12 +81,12 @@ export class Request {
       }
     }
     this._body = requestOptions.body;
+    this.contentType = this.initializeContentType();
     this.method = normalizeMethodName(requestOptions.method);
     // TODO(jeffbcross): implement behavior
     // Defaults to 'omit', consistent with browser
     // TODO(jeffbcross): implement behavior
     this.headers = new Headers(requestOptions.headers);
-    this.withCredentials = requestOptions.withCredentials;
   }
 
 
@@ -94,4 +96,76 @@ export class Request {
    * string.
    */
   text(): String { return isPresent(this._body) ? this._body.toString() : ''; }
+
+  /**
+   * Returns the request's body as JSON string, assuming that body exists. If body is undefined,
+   * return
+   * empty
+   * string.
+   */
+  json(): String { return isPresent(this._body) ? JSON.stringify(this._body) : ''; }
+
+  /**
+   * Returns the request's body as array buffer, assuming that body exists. If body is undefined,
+   * return
+   * null.
+   */
+  arrayBuffer(): ArrayBuffer {
+    if (this._body instanceof ArrayBuffer) return <ArrayBuffer>this._body;
+    throw "The request body isn't an array buffer";
+  }
+
+  /**
+   * Returns the request's body as blob, assuming that body exists. If body is undefined, return
+   * null.
+   */
+  blob(): Blob {
+    if (this._body instanceof Blob) return <Blob>this._body;
+    if (this._body instanceof ArrayBuffer) return new Blob([this._body]);
+    throw "The request body isn't either a blob or an array buffer";
+  }
+
+  /**
+   * Returns the content type of request's body based on its type.
+   */
+  initializeContentType() {
+    if (this._body == null) {
+      return ContentType.NONE;
+    } else if (this._body instanceof URLSearchParams) {
+      return ContentType.FORM;
+    } else if (this._body instanceof FormData) {
+      return ContentType.FORM_DATA;
+    } else if (this._body instanceof Blob) {
+      return ContentType.BLOB;
+    } else if (this._body instanceof ArrayBuffer) {
+      return ContentType.ARRAY_BUFFER;
+    } else if (typeof this._body === 'string') {
+      return ContentType.TEXT;
+    } else {
+      return ContentType.JSON;
+    }
+  }
+
+  /**
+   * Returns the request's body according to its type. If body is undefined, return
+   * null.
+   */
+  getBody(): any {
+    switch (this.contentType) {
+      case ContentType.JSON:
+        return this.json();
+      case ContentType.FORM:
+        return this.text();
+      case ContentType.FORM_DATA:
+        return this._body;
+      case ContentType.TEXT:
+        return this._body;
+      case ContentType.BLOB:
+        return this.blob();
+      case ContentType.ARRAY_BUFFER:
+        return this.arrayBuffer();
+      default:
+        return null;
+    };
+  }
 }

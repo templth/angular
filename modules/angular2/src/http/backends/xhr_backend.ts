@@ -10,6 +10,7 @@ import {isPresent} from 'angular2/src/facade/lang';
 import {Observable} from 'rxjs/Observable';
 import {Observer} from 'rxjs/Observer';
 import {isSuccess, getResponseURL} from '../http_utils';
+import {ContentType} from '../enums';
 
 /**
 * Creates connections using `XMLHttpRequest`. Given a fully-qualified
@@ -31,9 +32,6 @@ export class XHRConnection implements Connection {
     this.request = req;
     this.response = new Observable((responseObserver: Observer<Response>) => {
       let _xhr: XMLHttpRequest = browserXHR.build();
-      if (isPresent(req.withCredentials)) {
-      _xhr.withCredentials = req.withCredentials;
-      }
       _xhr.open(RequestMethod[req.method].toUpperCase(), req.url);
       // load event handler
       let onLoad = () => {
@@ -77,6 +75,8 @@ export class XHRConnection implements Connection {
         responseObserver.error(new Response(responseOptions));
       };
 
+      this.setContentType(req, _xhr);
+
       if (isPresent(req.headers)) {
         req.headers.forEach((values, name) => _xhr.setRequestHeader(name, values.join(',')));
       }
@@ -84,7 +84,7 @@ export class XHRConnection implements Connection {
       _xhr.addEventListener('load', onLoad);
       _xhr.addEventListener('error', onError);
 
-      _xhr.send(this.request.text());
+      _xhr.send(this.request.getBody());
 
       return () => {
         _xhr.removeEventListener('load', onLoad);
@@ -92,6 +92,25 @@ export class XHRConnection implements Connection {
         _xhr.abort();
       };
     });
+  }
+
+  setContentType(req, _xhr) {
+    switch (req.contentType) {
+      case ContentType.NONE:
+        break;
+      case ContentType.FORM:
+        _xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded;charset=UTF-8');
+        break;
+      case ContentType.JSON:
+        _xhr.setRequestHeader('Content-Type', 'application/json');
+        break;
+      case ContentType.BLOB:
+        var blob = req.blob();
+        if (blob.type) {
+          _xhr.setRequestHeader('Content-Type', blob.type);
+        }
+        break;
+    }
   }
 }
 

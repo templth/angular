@@ -44,7 +44,7 @@ export class RequestOptions {
    * Body to be used when creating a {@link Request}.
    */
   // TODO: support FormData, Blob, URLSearchParams
-  body: string;
+  body: string | Blob | ArrayBuffer | URLSearchParams | FormData | any;
   /**
    * Url with which to perform a {@link Request}.
    */
@@ -53,11 +53,7 @@ export class RequestOptions {
    * Search parameters to be included in a {@link Request}.
    */
   search: URLSearchParams;
-  /**
-   * Enable use credentials for a {@link Request}.
-   */
-  withCredentials: boolean;
-  constructor({method, headers, body, url, search, withCredentials}: RequestOptionsArgs = {}) {
+  constructor({method, headers, body, url, search}: RequestOptionsArgs = {}) {
     this.method = isPresent(method) ? normalizeMethodName(method) : null;
     this.headers = isPresent(headers) ? headers : null;
     this.body = isPresent(body) ? body : null;
@@ -65,7 +61,6 @@ export class RequestOptions {
     this.search = isPresent(search) ? (isString(search) ? new URLSearchParams(<string>(search)) :
                                                           <URLSearchParams>(search)) :
                                       null;
-    this.withCredentials = isPresent(withCredentials) ? withCredentials : null;
   }
 
   /**
@@ -103,8 +98,6 @@ export class RequestOptions {
                   (isString(options.search) ? new URLSearchParams(<string>(options.search)) :
                                               (<URLSearchParams>(options.search)).clone()) :
                   this.search,
-      withCredentials: isPresent(options) && isPresent(options.withCredentials) ?
-                  options.withCredentials : this.withCredentials
     });
   }
 }
