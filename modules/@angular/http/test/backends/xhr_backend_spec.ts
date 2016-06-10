@@ -230,6 +230,20 @@ export function main() {
         expect(setRequestHeaderSpy).toHaveBeenCalledWith('Content-Type', 'application/json');
       });
 
+      it('should use skip auto detection with custom content type specified to the request', () => {
+        var headers = new Headers({'Content-Type': 'text/plain'});
+
+        var body = {test: 'val'};
+        var base = new BaseRequestOptions();
+        var connection = new XHRConnection(
+            new Request(base.merge(new RequestOptions({body: body, headers: headers}))),
+            new MockBrowserXHR());
+        connection.response.subscribe();
+        expect(sendSpy).toHaveBeenCalledWith(JSON.stringify(body));
+        expect(setRequestHeaderSpy).toHaveBeenCalledWith('Content-Type', 'text/plain');
+        expect(setRequestHeaderSpy).not.toHaveBeenCalledWith('Content-Type', 'application/json');
+      });
+
       it('should use number body and detect content type header to the request', () => {
         var body = 23;
         var base = new BaseRequestOptions();
